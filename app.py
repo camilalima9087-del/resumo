@@ -115,6 +115,24 @@ def init_db():
         con.execute("INSERT INTO users(usuario,senha_hash,admin,criado_em) VALUES(?,?,1,?)",
                     (os.environ["ADMIN_USER"].strip(), generate_password_hash(os.environ["ADMIN_PASSWORD"]), agora()))
         log.info("Administrador inicial criado: %s", os.environ["ADMIN_USER"])
+        usuario_reset = os.environ.get("RESET_USER", "").strip()
+    senha_reset = os.environ.get("RESET_PASSWORD", "")
+
+    if usuario_reset and senha_reset:
+        usuario = con.execute(
+            "SELECT id FROM users WHERE usuario = ? COLLATE NOCASE",
+            (usuario_reset,)
+        ).fetchone()
+
+        if usuario:
+            con.execute(
+                "UPDATE users SET senha_hash = ? WHERE id = ?",
+                (generate_password_hash(senha_reset), usuario["id"])
+            )
+            log.info("Senha redefinida com sucesso.")
+        else:
+            log.warning("Usuário não encontrado para redefinição.")
+
     con.commit()
     con.close()
 
