@@ -1,0 +1,85 @@
+{% extends "base.html" %}
+{% from "_icons.html" import ic, pdf %}
+{% block titulo %}Meus Resumos · ResumoPro{% endblock %}
+{% block conteudo %}
+<header class="cab-pagina">
+  <span class="cab-ic">{{ ic('folder', 64) }}</span>
+  <div><h1>Meus Resumos</h1><p>Acesse, organize e gerencie seus resumos.</p></div>
+</header>
+
+<form method="get" action="{{ url_for('resumos') }}" class="busca" id="form-busca">
+  <label class="campo campo-busca">{{ ic('search', 24) }}
+    <input type="search" name="q" value="{{ q }}" placeholder="Buscar por nome do arquivo..." aria-label="Buscar" maxlength="80">
+  </label>
+  <label class="select-pilula">
+    <select name="status" id="filtro-status" aria-label="Filtrar">
+      <option value="todos" {{ 'selected' if status=='todos' }}>Todos</option>
+      <option value="concluido" {{ 'selected' if status=='concluido' }}>Prontos</option>
+      <option value="andamento" {{ 'selected' if status=='andamento' }}>Em andamento</option>
+      <option value="erro" {{ 'selected' if status=='erro' }}>Com erro</option>
+    </select>
+    {{ ic('down', 20) }}
+  </label>
+  <noscript><button class="btn btn-primario" type="submit">Buscar</button></noscript>
+</form>
+
+{% if not jobs %}
+  <div class="vazio-card">
+    {{ pdf(54) }}
+    <p>{% if q or status!='todos' %}Nenhum resumo encontrado com esse filtro.{% else %}Você ainda não gerou nenhum resumo.{% endif %}</p>
+    <a class="btn btn-primario" href="{{ url_for('inicio') }}">Criar um resumo</a>
+  </div>
+{% else %}
+<div class="cards" id="lista">
+  {% for j in jobs %}
+  <article class="rcard" data-id="{{ j['id'] }}" data-status="{{ j['status'] }}">
+    <span class="pdf-badge">{{ pdf(36) }}</span>
+    <div class="rinfo">
+      <h3 title="{{ arquivo_nome(j) }}">{{ arquivo_nome(j) }}</h3>
+      <p class="meta">{{ ic('calendar', 15) }} Criado em: {{ j['criado_em']|dia }}{% if j['status']=='concluido' and j['total'] %} • {{ j['total'] }} página{{ 's' if j['total']!=1 }}{% endif %}</p>
+      {% if j['disciplina'] or j['aula'] %}<p class="meta fraco">{{ j['disciplina'] }}{% if j['aula'] %} · Aula {{ j['aula'] }}{% endif %} · {{ 'IA' if j['modo']=='api' else 'Rápido' }}</p>{% endif %}
+      {% if j['status'] in ('fila','processando') %}
+        <p class="meta"><span class="selo">{{ 'Na fila' if j['status']=='fila' else 'Gerando…' }}</span></p>
+        <progress class="barra" max="{{ j['total'] or 1 }}" value="{{ j['progresso'] }}"></progress>
+      {% elif j['status']=='erro' %}
+        <p class="erro-txt">{{ j['erro'] }}</p>
+      {% endif %}
+      <div class="racoes">
+        {% if j['status']=='concluido' %}
+          <a class="btn btn-primario btn-peq" href="{{ url_for('ver', job_id=j['id']) }}" target="_blank" rel="noopener">{{ ic('eye', 18) }} Visualizar</a>
+          <a class="icone-btn" href="{{ url_for('baixar', job_id=j['id']) }}" aria-label="Baixar PDF" title="Baixar PDF">{{ ic('download', 20) }}</a>
+        {% endif %}
+        <details class="menu">
+          <summary class="icone-btn" aria-label="Mais opções">{{ ic('dots', 20) }}</summary>
+          <div class="menu-lista">
+            <form method="post" action="{{ url_for('excluir_job', job_id=j['id']) }}" data-confirma="Excluir este resumo?">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              <button type="submit" class="perigo">{{ ic('trash', 18) }} Excluir</button>
+            </form>
+          </div>
+        </details>
+      </div>
+    </div>
+  </article>
+  {% endfor %}
+</div>
+{% endif %}
+
+<div class="rodape-lista">
+  <div class="dica-card">{{ ic('bulb', 40) }}<div><strong>Dica!</strong><span>Você pode baixar seus resumos a qualquer momento.</span></div></div>
+  {% if paginas > 1 %}
+  <nav class="paginacao" aria-label="Paginação">
+    {% set base = {'q': q, 'status': status} %}
+    {% if pg > 1 %}<a class="pg" href="{{ url_for('resumos', q=q, status=status, p=pg-1) }}" aria-label="Anterior">{{ ic('left', 20) }}</a>{% else %}<span class="pg off">{{ ic('left', 20) }}</span>{% endif %}
+    {% for n in range(1, paginas+1) %}
+      {% if n == pg %}<span class="pg atual" aria-current="page">{{ n }}</span>
+      {% elif n <= 2 or n > paginas-2 or (n-pg)|abs <= 1 %}<a class="pg" href="{{ url_for('resumos', q=q, status=status, p=n) }}">{{ n }}</a>
+      {% elif (n-pg)|abs == 2 %}<span class="pg off">…</span>{% endif %}
+    {% endfor %}
+    {% if pg < paginas %}<a class="pg" href="{{ url_for('resumos', q=q, status=status, p=pg+1) }}" aria-label="Próxima">{{ ic('right', 20) }}</a>{% else %}<span class="pg off">{{ ic('right', 20) }}</span>{% endif %}
+  </nav>
+  {% else %}
+  <nav class="paginacao"><span class="pg off">{{ ic('left', 20) }}</span><span class="pg atual">1</span><span class="pg off">{{ ic('right', 20) }}</span></nav>
+  {% endif %}
+</div>
+{% endblock %}

@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+{% from "_icons.html" import ic %}
+{% block titulo %}Excluir conta · ResumoPro{% endblock %}
+{% block conteudo %}
+<header class="cab-pagina"><span class="cab-ic">{{ ic('trash', 64) }}</span><div><h1>Excluir minha conta</h1><p>Essa ação é permanente.</p></div></header>
+<section class="cfg-card estreito">
+  <p>Sua conta e <strong>todos os seus resumos</strong> serão apagados e não poderão ser recuperados. Se quiser guardar uma cópia, exporte seus dados antes.</p>
+  <form method="post" data-confirma="Tem certeza? Esta ação não pode ser desfeita.">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <label for="s">Digite sua senha para confirmar</label><input id="s" name="senha" type="password" required autocomplete="current-password">
+    <div class="acoes-form"><button class="btn btn-perigo" type="submit">Excluir definitivamente</button><a class="btn btn-contorno" href="{{ url_for('configuracoes') }}">Cancelar</a></div>
+  </form>
+</section>
+{% endblock %}

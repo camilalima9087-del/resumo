@@ -1,0 +1,49 @@
+{% from "_icons.html" import ic, logo %}
+<!doctype html>
+<html lang="pt-BR" data-tema="{{ g.user['tema'] if g.user else 'claro' }}">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block titulo %}ResumoPro{% endblock %}</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%230b3a26'/%3E%3Cpath d='M9 10h14M9 16h14M9 22h8' stroke='%23a9d3ab' stroke-width='3' stroke-linecap='round'/%3E%3C/svg%3E">
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body data-notif="{{ g.user['notif_sistema'] if g.user else 0 }}">
+{% block corpo %}
+{% set ep = request.endpoint %}
+{% if g.user %}
+<div class="app">
+  <aside class="side">
+    <a class="side-logo" href="{{ url_for('inicio') }}" aria-label="ResumoPro - início">
+      {{ logo(64) }}
+      <span class="marca">Resumo<em>Pro</em></span>
+    </a>
+    <nav class="side-nav">
+      <a href="{{ url_for('inicio') }}" class="{{ 'ativo' if ep=='inicio' }}">{{ ic('home') }}<span>Início</span></a>
+      <a href="{{ url_for('resumos') }}" class="{{ 'ativo' if ep=='resumos' }}">{{ ic('folder') }}<span>Meus Resumos</span></a>
+      <a href="{{ url_for('configuracoes') }}" class="{{ 'ativo' if ep=='configuracoes' or (ep or '').startswith('conta_') }}">{{ ic('gear') }}<span>Configurações</span></a>
+      {% if g.user['admin'] %}<a href="{{ url_for('admin') }}" class="{{ 'ativo' if ep=='admin' }}">{{ ic('users') }}<span>Usuários</span></a>{% endif %}
+      <form method="post" action="{{ url_for('sair') }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <button type="submit">{{ ic('logout') }}<span>Sair</span></button>
+      </form>
+    </nav>
+    <p class="side-frase">{{ ic('spark', 22) }}<span>Estude melhor.<br>Faça mais.</span></p>
+  </aside>
+  <div class="area">
+    <i class="blob blob-a"></i><i class="blob blob-b"></i><i class="blob blob-c"></i>
+    <div class="topo-dir">{% block topo_dir %}<a class="avatar-top" href="{{ url_for('configuracoes') }}" aria-label="Minha conta">{{ ic('user', 26) }}</a>{% endblock %}</div>
+    <main class="conteudo">
+{% else %}
+<div class="publico"><main class="conteudo">
+{% endif %}
+      {% with msgs = get_flashed_messages(with_categories=true) %}
+        {% for cat, m in msgs %}<div class="aviso aviso-{{ cat }}" role="status">{{ m }}</div>{% endfor %}
+      {% endwith %}
+      {% block conteudo %}{% endblock %}
+    </main>
+{% if g.user %}</div></div>{% else %}</div>{% endif %}
+{% endblock %}
+<script src="{{ url_for('static', filename='app.js') }}"></script>
+</body>
+</html>

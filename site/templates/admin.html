@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+{% from "_icons.html" import ic %}
+{% block titulo %}Usuários · ResumoPro{% endblock %}
+{% block conteudo %}
+<header class="cab-pagina"><span class="cab-ic">{{ ic('users', 64) }}</span><div><h1>Usuários</h1><p>Crie e gerencie as contas de acesso.</p></div></header>
+<div class="cfg-grade">
+  <section class="cfg-card">
+    <h2>{{ ic('user', 34) }}<span>Novo usuário<small>Só administradores criam contas.</small></span></h2>
+    <form method="post" action="{{ url_for('admin_criar') }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <label for="u">Usuário</label><input id="u" name="usuario" required maxlength="60" autocomplete="off">
+      <label for="em">E-mail (opcional)</label><input id="em" name="email" type="email" maxlength="120" autocomplete="off">
+      <label for="s">Senha (mín. 8 caracteres)</label><input id="s" name="senha" type="password" required minlength="8" autocomplete="new-password">
+      <label class="check"><input type="checkbox" name="admin" value="1"> Administrador</label>
+      <div class="acoes-form"><button class="btn btn-primario" type="submit">Criar usuário</button></div>
+    </form>
+  </section>
+  <section class="cfg-card">
+    <h2>{{ ic('users', 34) }}<span>Usuários ({{ usuarios|length }})<small>Troque senhas ou exclua contas.</small></span></h2>
+    <ul class="lista-u">
+      {% for u in usuarios %}
+      <li>
+        <div class="u-info"><strong>{{ u['usuario'] }}{% if u['admin'] %} <span class="selo">admin</span>{% endif %}</strong>
+          <span class="meta">{{ u['email'] or 'sem e-mail' }} · criado em {{ u['criado_em']|dia }} · {{ u['n_jobs'] }} resumo(s)</span></div>
+        <div class="u-acoes">
+          <form method="post" action="{{ url_for('admin_senha', uid=u['id']) }}" class="inline">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <input name="senha" type="password" minlength="8" placeholder="Nova senha" required autocomplete="new-password" aria-label="Nova senha de {{ u['usuario'] }}">
+            <button class="btn btn-contorno btn-peq" type="submit">Trocar</button>
+          </form>
+          {% if u['id'] != g.user['id'] %}
+          <form method="post" action="{{ url_for('admin_excluir', uid=u['id']) }}" data-confirma="Excluir este usuário e todos os resumos dele?">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <button class="btn btn-perigo btn-peq" type="submit">Excluir</button>
+          </form>
+          {% endif %}
+        </div>
+      </li>
+      {% endfor %}
+    </ul>
+  </section>
+</div>
+{% endblock %}

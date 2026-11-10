@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% from "_icons.html" import ic %}
+{% block titulo %}Alterar senha · ResumoPro{% endblock %}
+{% block conteudo %}
+<header class="cab-pagina"><span class="cab-ic">{{ ic('lock', 64) }}</span><div><h1>Alterar senha</h1><p>Use pelo menos 8 caracteres.</p></div></header>
+<section class="cfg-card estreito">
+  <form method="post">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <label for="a">Senha atual</label><input id="a" name="atual" type="password" required autocomplete="current-password">
+    <label for="n">Nova senha</label><input id="n" name="nova" type="password" required minlength="8" autocomplete="new-password">
+    <label for="c">Confirmar nova senha</label><input id="c" name="conf" type="password" required minlength="8" autocomplete="new-password">
+    <div class="acoes-form"><button class="btn btn-primario" type="submit">Alterar senha</button><a class="btn btn-contorno" href="{{ url_for('configuracoes') }}">Cancelar</a></div>
+  </form>
+</section>
+{% endblock %}

@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+{% from "_icons.html" import ic %}
+{% block titulo %}Configurações · ResumoPro{% endblock %}
+{% block conteudo %}
+<header class="cab-pagina">
+  <span class="cab-ic">{{ ic('gear', 64) }}</span>
+  <div><h1>Configurações</h1><p>Personalize sua experiência no ResumoPro.</p></div>
+</header>
+
+<div class="cfg-grade">
+  <section class="cfg-card">
+    <h2>{{ ic('user', 34) }}<span>Perfil do Usuário<small>Confira suas informações.</small></span></h2>
+    <div class="perfil">
+      <a class="avatar-grande" href="{{ url_for('conta_perfil') }}" aria-label="Editar perfil">
+        {{ ic('user', 78) }}<span class="lapis">{{ ic('pencil', 16) }}</span>
+      </a>
+      <div>
+        <strong class="perfil-nome">{{ g.user['usuario'] }}</strong>
+        <span class="perfil-email">{{ g.user['email'] or 'Nenhum e-mail cadastrado' }}</span>
+        <a class="btn btn-contorno" href="{{ url_for('conta_perfil') }}">{{ ic('pencil', 18) }} Editar perfil</a>
+      </div>
+    </div>
+  </section>
+
+  <section class="cfg-card">
+    <h2>{{ ic('palette', 34) }}<span>Aparência<small>Escolha o tema da sua interface.</small></span></h2>
+    <form method="post" action="{{ url_for('config_tema') }}" class="temas">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <input type="hidden" name="next" value="/configuracoes">
+      <button name="tema" value="claro" type="submit" class="tema-op {{ 'sel' if g.user['tema']=='claro' }}">{{ ic('sun', 30) }}<span>Claro</span><i class="radio"></i></button>
+      <button name="tema" value="escuro" type="submit" class="tema-op {{ 'sel' if g.user['tema']=='escuro' }}">{{ ic('moon', 30) }}<span>Escuro</span><i class="radio"></i></button>
+    </form>
+  </section>
+
+  <section class="cfg-card">
+    <h2>{{ ic('bell', 34) }}<span>Notificações<small>Gerencie suas preferências.</small></span></h2>
+    <form method="post" action="{{ url_for('config_notif') }}" id="form-notif" class="linhas">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <label class="linha">{{ ic('bell', 24) }}<span>Notificações do sistema</span>
+        <input type="checkbox" class="chave" name="sistema" value="1" id="chk-sistema" {{ 'checked' if g.user['notif_sistema'] }}></label>
+      <label class="linha">{{ ic('calendar', 24) }}<span>Lembretes de uso</span>
+        <input type="checkbox" class="chave" name="lembretes" value="1" {{ 'checked' if g.user['notif_lembretes'] }}></label>
+      <noscript><button class="btn btn-primario btn-peq" type="submit">Salvar</button></noscript>
+    </form>
+  </section>
+
+  <section class="cfg-card">
+    <h2>{{ ic('shield', 34) }}<span>Privacidade e Dados<small>Controle seus dados e segurança.</small></span></h2>
+    <div class="linhas">
+      <form method="post" action="{{ url_for('conta_exportar') }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <button type="submit" class="linha link">{{ ic('database', 24) }}<span>Exportar meus dados</span>{{ ic('right', 20) }}</button>
+      </form>
+      <a class="linha link" href="{{ url_for('conta_excluir') }}">{{ ic('trash', 24) }}<span>Excluir minha conta</span>{{ ic('right', 20) }}</a>
+      <a class="linha link" href="{{ url_for('conta_senha') }}">{{ ic('lock', 24) }}<span>Alterar senha</span>{{ ic('right', 20) }}</a>
+    </div>
+  </section>
+</div>
+{% endblock %}

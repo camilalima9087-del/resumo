@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% from "_icons.html" import ic %}
+{% block titulo %}Editar perfil · ResumoPro{% endblock %}
+{% block conteudo %}
+<header class="cab-pagina"><span class="cab-ic">{{ ic('user', 64) }}</span><div><h1>Editar perfil</h1><p>Atualize seus dados de contato.</p></div></header>
+<section class="cfg-card estreito">
+  <form method="post">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <label for="u">Usuário</label><input id="u" value="{{ g.user['usuario'] }}" disabled>
+    <label for="e">E-mail (opcional, também serve para entrar)</label>
+    <input id="e" name="email" type="email" maxlength="120" value="{{ g.user['email'] or '' }}" placeholder="voce@exemplo.com" autocomplete="email">
+    <div class="acoes-form"><button class="btn btn-primario" type="submit">Salvar</button><a class="btn btn-contorno" href="{{ url_for('configuracoes') }}">Cancelar</a></div>
+  </form>
+</section>
+{% endblock %}
