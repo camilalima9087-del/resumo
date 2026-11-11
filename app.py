@@ -253,6 +253,14 @@ app.jinja_env.globals["arquivo_nome"] = arquivo_nome
 EMAIL_RE = re.compile(r"^[^@\s]{1,64}@[^@\s]+\.[^@\s]{2,}$")
 
 
+def resposta(msg, cat, destino):
+    """Guarda a mensagem e redireciona; se o envio veio do JavaScript (X-Fetch), responde em JSON."""
+    flash(msg, cat)
+    if request.headers.get("X-Fetch") == "1":
+        return jsonify(destino=destino)
+    return redirect(destino)
+
+
 def limpo(s, n):
     return re.sub(r"\s+", " ", (s or "")).strip()[:n]
 
@@ -370,13 +378,11 @@ def trabalhador(job_id, pdf_path, disciplina, aula, nome, modo):
 def novo():
     arq = request.files.get("pdf")
     if not arq or not arq.filename:
-        flash("Escolha um arquivo PDF.", "erro")
-        return redirect(url_for("inicio"))
+        return resposta("Escolha um arquivo PDF.", "erro", url_for("inicio"))
     cab = arq.stream.read(5)
     arq.stream.seek(0)
     if not arq.filename.lower().endswith(".pdf") or cab != b"%PDF-":
-        flash("O arquivo precisa ser um PDF válido.", "erro")
-        return redirect(url_for("inicio"))
+        return resposta("O arquivo precisa ser um PDF válido.", "erro", url_for("inicio"))
     modo = request.form.get("modo", "local")
     if modo not in ("local", "api") or (modo == "api" and not os.environ.get("ANTHROPIC_API_KEY")):
         modo = "local"
@@ -391,8 +397,7 @@ def novo():
                       (g.user["id"], nome, disciplina, aula, modo, "fila", agora()))
     con.commit()
     threading.Thread(target=trabalhador, args=(cur.lastrowid, destino, disciplina, aula, nome, modo), daemon=True).start()
-    flash("Arquivo recebido! O resumo está sendo gerado.", "ok")
-    return redirect(url_for("resumos"))
+    return resposta("Arquivo recebido! O resumo está sendo gerado.", "ok", url_for("resumos"))
 
 
 @app.get("/api/jobs")
@@ -634,8 +639,8 @@ def cli_criar():
 
 @app.errorhandler(413)
 def _grande(_):
-    flash(f"Arquivo muito grande (máx. {app.config['MAX_CONTENT_LENGTH'] // 1024 // 1024} MB).", "erro")
-    return redirect(url_for("inicio") if g.get("user") else url_for("login"))
+    return resposta(f"Arquivo muito grande (máx. {app.config['MAX_CONTENT_LENGTH'] // 1024 // 1024} MB).", "erro",
+                    url_for("inicio") if g.get("user") else url_for("login"))
 
 
 @app.errorhandler(404)
