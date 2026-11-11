@@ -120,6 +120,7 @@ def init_db():
         )
         log.info("Administrador inicial criado: %s", os.environ["ADMIN_USER"])
 
+    
     novo_usuario = os.environ.get("NOVO_ADMIN_USER", "").strip()
     nova_senha = os.environ.get("NOVO_ADMIN_PASSWORD", "")
 
@@ -129,10 +130,18 @@ def init_db():
             (novo_usuario,)
         ).fetchone()
 
-        if not existente:
+        senha_hash = generate_password_hash(nova_senha)
+
+        if existente:
+            con.execute(
+                "UPDATE users SET senha_hash = ?, admin = 1 WHERE id = ?",
+                (senha_hash, existente["id"])
+            )
+            log.info("Senha do novo administrador atualizada.")
+        else:
             con.execute(
                 "INSERT INTO users(usuario, senha_hash, admin, criado_em) VALUES(?,?,1,?)",
-                (novo_usuario, generate_password_hash(nova_senha), agora())
+                (novo_usuario, senha_hash, agora())
             )
             log.info("Novo administrador criado.")
 
