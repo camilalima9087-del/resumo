@@ -110,12 +110,17 @@ def init_db():
                 "WHERE email IS NOT NULL AND email <> ''")
     con.execute("UPDATE jobs SET status='erro', erro='Interrompido (servidor reiniciado).' "
                 "WHERE status IN ('fila','processando')")
-    n = con.execute("SELECT COUNT(*) FROM users").fetchone()[0]
+            n = con.execute("SELECT COUNT(*) FROM users").fetchone()[0]
+
     if n == 0 and os.environ.get("ADMIN_USER") and os.environ.get("ADMIN_PASSWORD"):
-        con.execute("INSERT INTO users(usuario,senha_hash,admin,criado_em) VALUES(?,?,1,?)",
-                    (os.environ["ADMIN_USER"].strip(), generate_password_hash(os.environ["ADMIN_PASSWORD"]), agora()))
+        con.execute(
+            "INSERT INTO users(usuario,senha_hash,admin,criado_em) VALUES(?,?,1,?)",
+            (os.environ["ADMIN_USER"].strip(),
+             generate_password_hash(os.environ["ADMIN_PASSWORD"]), agora())
+        )
         log.info("Administrador inicial criado: %s", os.environ["ADMIN_USER"])
-        usuario_reset = os.environ.get("RESET_USER", "").strip()
+
+    usuario_reset = os.environ.get("RESET_USER", "").strip()
     senha_reset = os.environ.get("RESET_PASSWORD", "")
 
     if usuario_reset and senha_reset:
