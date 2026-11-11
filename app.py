@@ -137,13 +137,14 @@ def init_db():
                 "UPDATE users SET senha_hash = ?, admin = 1 WHERE id = ?",
                 (senha_hash, existente["id"])
             )
-            log.info("Senha do novo administrador atualizada.")
+            print("NOVO ADMIN: senha atualizada com sucesso.")
         else:
             con.execute(
                 "INSERT INTO users(usuario, senha_hash, admin, criado_em) VALUES(?,?,1,?)",
                 (novo_usuario, senha_hash, agora())
             )
-            log.info("Novo administrador criado.")
+            print("NOVO ADMIN: usuário criado com sucesso.")
+
 
     usuario_reset = os.environ.get("RESET_USER", "").strip()
     senha_reset = os.environ.get("RESET_PASSWORD", "")
