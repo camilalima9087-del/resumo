@@ -97,6 +97,35 @@ def agora():
     return datetime.now(timezone.utc).isoformat(timespec="seconds")
 
 
+def garantir_admin(con):
+    """Cria o administrador definido nas variaveis de ambiente (com ADMIN_FORCE_RESET=1, tambem redefine a senha).
+    Nunca escreve senhas nos logs."""
+    usuario = os.environ.get("ADMIN_USER", "").strip()
+    senha = os.environ.get("ADMIN_PASSWORD", "").strip()
+    forcar = os.environ.get("ADMIN_FORCE_RESET", "").strip() == "1"
+    n = con.execute("SELECT COUNT(*) FROM users").fetchone()[0]
+    log.info("Banco de dados: %s | usuarios cadastrados: %s", DB_PATH, n)
+    if os.environ.get("RENDER") and not os.environ.get("DATA_DIR"):
+        log.warning("ATENCAO: DATA_DIR nao definido no Render. O banco fica no disco temporario e e apagado "
+                    "a cada reinicio ou deploy (usuarios criados no site somem).")
+    if not usuario or not senha:
+        if n == 0:
+            log.warning("Nenhum usuario existe e ADMIN_USER/ADMIN_PASSWORD nao estao definidos: ninguem conseguira entrar.")
+        return
+    existente = con.execute("SELECT id FROM users WHERE usuario=? COLLATE NOCASE", (usuario,)).fetchone()
+    if existente is None and (n == 0 or forcar):
+        con.execute("INSERT INTO users(usuario,senha_hash,admin,criado_em) VALUES(?,?,1,?)",
+                    (usuario, generate_password_hash(senha), agora()))
+        log.info("Administrador '%s' criado (senha com %d caracteres).", usuario, len(senha))
+    elif existente is not None and forcar:
+        con.execute("UPDATE users SET senha_hash=?, admin=1 WHERE id=?", (generate_password_hash(senha), existente["id"]))
+        log.info("Senha do administrador '%s' REDEFINIDA (%d caracteres). Remova ADMIN_FORCE_RESET agora.", usuario, len(senha))
+    elif existente is not None:
+        log.info("Administrador '%s' ja existe; senha mantida (para redefinir use ADMIN_FORCE_RESET=1).", usuario)
+    else:
+        log.info("Ja existem usuarios; o administrador '%s' nao foi criado (use ADMIN_FORCE_RESET=1 para criar).", usuario)
+
+
 def init_db():
     con = conectar()
     con.executescript(SCHEMA)
@@ -110,61 +139,7 @@ def init_db():
                 "WHERE email IS NOT NULL AND email <> ''")
     con.execute("UPDATE jobs SET status='erro', erro='Interrompido (servidor reiniciado).' "
                 "WHERE status IN ('fila','processando')")
-    n = con.execute("SELECT COUNT(*) FROM users").fetchone()[0]
-
-    if n == 0 and os.environ.get("ADMIN_USER") and os.environ.get("ADMIN_PASSWORD"):
-        con.execute(
-            "INSERT INTO users(usuario,senha_hash,admin,criado_em) VALUES(?,?,1,?)",
-            (os.environ["ADMIN_USER"].strip(),
-             generate_password_hash(os.environ["ADMIN_PASSWORD"]), agora())
-        )
-        log.info("Administrador inicial criado: %s", os.environ["ADMIN_USER"])
-
-    
-    novo_usuario = os.environ.get("NOVO_ADMIN_USER", "").strip()
-    nova_senha = os.environ.get("NOVO_ADMIN_PASSWORD", "")
-
-    print("DIAGNÓSTICO:", bool(novo_usuario), bool(nova_senha))
-
-    if novo_usuario and nova_senha:
-        existente = con.execute(
-            "SELECT id FROM users WHERE usuario = ? COLLATE NOCASE",
-            (novo_usuario,)
-        ).fetchone()
-        senha_hash = generate_password_hash(nova_senha)
-
-        if existente:
-            con.execute(
-                "UPDATE users SET senha_hash = ?, admin = 1 WHERE id = ?",
-                (senha_hash, existente["id"])
-            )
-            print("NOVO ADMIN: senha atualizada com sucesso.")
-        else:
-            con.execute(
-                "INSERT INTO users(usuario, senha_hash, admin, criado_em) VALUES(?,?,1,?)",
-                (novo_usuario, senha_hash, agora())
-            )
-            print("NOVO ADMIN: usuário criado com sucesso.")
-
-
-    usuario_reset = os.environ.get("RESET_USER", "").strip()
-    senha_reset = os.environ.get("RESET_PASSWORD", "")
-
-    if usuario_reset and senha_reset:
-        usuario = con.execute(
-            "SELECT id FROM users WHERE usuario = ? COLLATE NOCASE",
-            (usuario_reset,)
-        ).fetchone()
-
-        if usuario:
-            con.execute(
-                "UPDATE users SET senha_hash = ? WHERE id = ?",
-                (generate_password_hash(senha_reset), usuario["id"])
-            )
-            log.info("Senha redefinida com sucesso.")
-        else:
-            log.warning("Usuário não encontrado para redefinição.")
-
+    garantir_admin(con)
     con.commit()
     con.close()
 
@@ -297,6 +272,10 @@ def login():
                          "ORDER BY CASE WHEN usuario=? COLLATE NOCASE THEN 0 ELSE 1 END LIMIT 1",
                          (usuario, usuario, usuario)).fetchone()
         ok = check_password_hash(u["senha_hash"] if u else _HASH_FALSO, senha)
+        if not u:
+            log.info("Login falhou: usuario ou e-mail '%s' nao existe.", usuario)
+        elif not ok:
+            log.info("Login falhou: senha nao confere para '%s'.", usuario)
         if u and ok:
             session.clear()
             session["uid"] = u["id"]
