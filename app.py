@@ -124,12 +124,13 @@ def init_db():
     novo_usuario = os.environ.get("NOVO_ADMIN_USER", "").strip()
     nova_senha = os.environ.get("NOVO_ADMIN_PASSWORD", "")
 
+    print("DIAGNÓSTICO:", bool(novo_usuario), bool(nova_senha))
+
     if novo_usuario and nova_senha:
         existente = con.execute(
             "SELECT id FROM users WHERE usuario = ? COLLATE NOCASE",
             (novo_usuario,)
         ).fetchone()
-
         senha_hash = generate_password_hash(nova_senha)
 
         if existente:
