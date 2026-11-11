@@ -43,11 +43,7 @@ def _secret():
     return f.read_text().strip()
 
 
-app = Flask(
-    __name__,
-    template_folder=str(BASE / "templates"),
-    static_folder=str(BASE / "static")
-)
+app = Flask(__name__)
 app.config.update(
     SECRET_KEY=_secret(),
     MAX_CONTENT_LENGTH=int(os.environ.get("MAX_UPLOAD_MB", "25")) * 1024 * 1024,
@@ -101,6 +97,35 @@ def agora():
     return datetime.now(timezone.utc).isoformat(timespec="seconds")
 
 
+def garantir_admin(con):
+    """Cria o administrador definido nas variaveis de ambiente (com ADMIN_FORCE_RESET=1, tambem redefine a senha).
+    Nunca escreve senhas nos logs."""
+    usuario = os.environ.get("ADMIN_USER", "").strip()
+    senha = os.environ.get("ADMIN_PASSWORD", "").strip()
+    forcar = os.environ.get("ADMIN_FORCE_RESET", "").strip() == "1"
+    n = con.execute("SELECT COUNT(*) FROM users").fetchone()[0]
+    log.info("Banco de dados: %s | usuarios cadastrados: %s", DB_PATH, n)
+    if os.environ.get("RENDER") and not os.environ.get("DATA_DIR"):
+        log.warning("ATENCAO: DATA_DIR nao definido no Render. O banco fica no disco temporario e e apagado "
+                    "a cada reinicio ou deploy (usuarios criados no site somem).")
+    if not usuario or not senha:
+        if n == 0:
+            log.warning("Nenhum usuario existe e ADMIN_USER/ADMIN_PASSWORD nao estao definidos: ninguem conseguira entrar.")
+        return
+    existente = con.execute("SELECT id FROM users WHERE usuario=? COLLATE NOCASE", (usuario,)).fetchone()
+    if existente is None and (n == 0 or forcar):
+        con.execute("INSERT INTO users(usuario,senha_hash,admin,criado_em) VALUES(?,?,1,?)",
+                    (usuario, generate_password_hash(senha), agora()))
+        log.info("Administrador '%s' criado (senha com %d caracteres).", usuario, len(senha))
+    elif existente is not None and forcar:
+        con.execute("UPDATE users SET senha_hash=?, admin=1 WHERE id=?", (generate_password_hash(senha), existente["id"]))
+        log.info("Senha do administrador '%s' REDEFINIDA (%d caracteres). Remova ADMIN_FORCE_RESET agora.", usuario, len(senha))
+    elif existente is not None:
+        log.info("Administrador '%s' ja existe; senha mantida (para redefinir use ADMIN_FORCE_RESET=1).", usuario)
+    else:
+        log.info("Ja existem usuarios; o administrador '%s' nao foi criado (use ADMIN_FORCE_RESET=1 para criar).", usuario)
+
+
 def init_db():
     con = conectar()
     con.executescript(SCHEMA)
@@ -114,11 +139,7 @@ def init_db():
                 "WHERE email IS NOT NULL AND email <> ''")
     con.execute("UPDATE jobs SET status='erro', erro='Interrompido (servidor reiniciado).' "
                 "WHERE status IN ('fila','processando')")
-    n = con.execute("SELECT COUNT(*) FROM users").fetchone()[0]
-    if n == 0 and os.environ.get("ADMIN_USER") and os.environ.get("ADMIN_PASSWORD"):
-        con.execute("INSERT INTO users(usuario,senha_hash,admin,criado_em) VALUES(?,?,1,?)",
-                    (os.environ["ADMIN_USER"].strip(), generate_password_hash(os.environ["ADMIN_PASSWORD"]), agora()))
-        log.info("Administrador inicial criado: %s", os.environ["ADMIN_USER"])
+    garantir_admin(con)
     con.commit()
     con.close()
 
@@ -232,6 +253,14 @@ app.jinja_env.globals["arquivo_nome"] = arquivo_nome
 EMAIL_RE = re.compile(r"^[^@\s]{1,64}@[^@\s]+\.[^@\s]{2,}$")
 
 
+def resposta(msg, cat, destino):
+    """Guarda a mensagem e redireciona; se o envio veio do JavaScript (X-Fetch), responde em JSON."""
+    flash(msg, cat)
+    if request.headers.get("X-Fetch") == "1":
+        return jsonify(destino=destino)
+    return redirect(destino)
+
+
 def limpo(s, n):
     return re.sub(r"\s+", " ", (s or "")).strip()[:n]
 
@@ -251,6 +280,10 @@ def login():
                          "ORDER BY CASE WHEN usuario=? COLLATE NOCASE THEN 0 ELSE 1 END LIMIT 1",
                          (usuario, usuario, usuario)).fetchone()
         ok = check_password_hash(u["senha_hash"] if u else _HASH_FALSO, senha)
+        if not u:
+            log.info("Login falhou: usuario ou e-mail '%s' nao existe.", usuario)
+        elif not ok:
+            log.info("Login falhou: senha nao confere para '%s'.", usuario)
         if u and ok:
             session.clear()
             session["uid"] = u["id"]
@@ -345,13 +378,11 @@ def trabalhador(job_id, pdf_path, disciplina, aula, nome, modo):
 def novo():
     arq = request.files.get("pdf")
     if not arq or not arq.filename:
-        flash("Escolha um arquivo PDF.", "erro")
-        return redirect(url_for("inicio"))
+        return resposta("Escolha um arquivo PDF.", "erro", url_for("inicio"))
     cab = arq.stream.read(5)
     arq.stream.seek(0)
     if not arq.filename.lower().endswith(".pdf") or cab != b"%PDF-":
-        flash("O arquivo precisa ser um PDF válido.", "erro")
-        return redirect(url_for("inicio"))
+        return resposta("O arquivo precisa ser um PDF válido.", "erro", url_for("inicio"))
     modo = request.form.get("modo", "local")
     if modo not in ("local", "api") or (modo == "api" and not os.environ.get("ANTHROPIC_API_KEY")):
         modo = "local"
@@ -366,8 +397,7 @@ def novo():
                       (g.user["id"], nome, disciplina, aula, modo, "fila", agora()))
     con.commit()
     threading.Thread(target=trabalhador, args=(cur.lastrowid, destino, disciplina, aula, nome, modo), daemon=True).start()
-    flash("Arquivo recebido! O resumo está sendo gerado.", "ok")
-    return redirect(url_for("resumos"))
+    return resposta("Arquivo recebido! O resumo está sendo gerado.", "ok", url_for("resumos"))
 
 
 @app.get("/api/jobs")
@@ -609,8 +639,8 @@ def cli_criar():
 
 @app.errorhandler(413)
 def _grande(_):
-    flash(f"Arquivo muito grande (máx. {app.config['MAX_CONTENT_LENGTH'] // 1024 // 1024} MB).", "erro")
-    return redirect(url_for("inicio") if g.get("user") else url_for("login"))
+    return resposta(f"Arquivo muito grande (máx. {app.config['MAX_CONTENT_LENGTH'] // 1024 // 1024} MB).", "erro",
+                    url_for("inicio") if g.get("user") else url_for("login"))
 
 
 @app.errorhandler(404)
